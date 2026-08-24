@@ -432,8 +432,9 @@ function onGoogleConnected() {
   document.getElementById("gcal-picker").classList.remove("hidden");
   document.getElementById("ajustes-gcal-connect").classList.add("hidden");
   document.getElementById("ajustes-gcal-disconnect").classList.remove("hidden");
-  fetchCalendarList();
-  fetchGoogleEvents();
+  // Espera a resolver qué calendario compartido usar antes de pedir eventos,
+  // para no mostrar nunca (ni de paso) los del calendario personal.
+  fetchCalendarList().then(fetchGoogleEvents);
 }
 
 async function fetchCalendarList() {
@@ -445,19 +446,25 @@ async function fetchCalendarList() {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    const calendars = data.items || [];
+    // Se excluye el calendario personal ("primary") a propósito: en el iPad familiar
+    // solo debe quedar disponible el/los calendarios compartidos.
+    const calendars = (data.items || []).filter((cal) => !cal.primary);
     sel.innerHTML = "";
     calendars.forEach((cal) => {
       const opt = document.createElement("option");
       opt.value = cal.id;
-      opt.textContent = cal.summary + (cal.primary ? " (principal)" : "");
+      opt.textContent = cal.summary;
       if (cal.id === state.selectedCalendarId) opt.selected = true;
       sel.appendChild(opt);
     });
-    // Si el calendario guardado ya no existe en la lista, cae de nuevo a "primary".
-    if (!calendars.some((c) => c.id === state.selectedCalendarId)) {
-      state.selectedCalendarId = "primary";
+    // Si el calendario guardado ya no está disponible (o era "primary"), usa el primero de la lista filtrada.
+    if (!calendars.some((c) => c.id === state.selectedCalendarId) && calendars.length > 0) {
+      state.selectedCalendarId = calendars[0].id;
+      sel.value = state.selectedCalendarId;
       saveState();
+    }
+    if (calendars.length === 0) {
+      sel.innerHTML = `<option value="">No hay calendarios compartidos en esta cuenta</option>`;
     }
   } catch (e) {
     console.error("No se pudo cargar la lista de calendarios", e);
