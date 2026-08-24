@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>Calendario Familiar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📅</text></svg>" />
 </head>
@@ -122,8 +125,10 @@
         <option value="#B983FF">🟣 Morado</option>
         <option value="#FF9F45">🟠 Naranja</option>
       </select>
-      <button id="miembro-add" class="btn-primary">Agregar miembro</button>
     </div>
+    <p class="muted">Elige un avatar:</p>
+    <div id="avatar-picker" class="avatar-picker"></div>
+    <button id="miembro-add" class="btn-primary">Agregar miembro</button>
     <div id="miembros-lista" class="chip-list"></div>
 
     <h2>Google Calendar</h2>

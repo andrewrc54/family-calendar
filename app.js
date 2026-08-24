@@ -5,6 +5,13 @@ const STORAGE_KEY = "familyCalendarState";
 const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const MEALS = ["Desayuno", "Almuerzo", "Cena"];
 
+const AVATARS = [
+  "🦄", "🐶", "🐱", "🦊", "🐻", "🐼", "🦁", "🐸",
+  "🐵", "🦋", "🐳", "🦖", "🐧", "🐰", "🐨", "🦉",
+  "🌟", "🚀", "⚽", "🎨", "🎮", "🍕", "🍦", "🌈",
+];
+let selectedAvatar = AVATARS[0];
+
 function defaultState() {
   return {
     members: [],
@@ -125,6 +132,26 @@ document.getElementById("ubicacion-btn").addEventListener("click", () => {
 
 /* ===================== Miembros (Ajustes) ===================== */
 
+function memberAvatar(m) {
+  return m.avatar || "🙂";
+}
+
+function renderAvatarPicker() {
+  const wrap = document.getElementById("avatar-picker");
+  wrap.innerHTML = "";
+  AVATARS.forEach((emoji) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "avatar-option" + (emoji === selectedAvatar ? " selected" : "");
+    btn.textContent = emoji;
+    btn.onclick = () => {
+      selectedAvatar = emoji;
+      renderAvatarPicker();
+    };
+    wrap.appendChild(btn);
+  });
+}
+
 function renderMiembrosLista() {
   const wrap = document.getElementById("miembros-lista");
   wrap.innerHTML = "";
@@ -132,7 +159,7 @@ function renderMiembrosLista() {
     const chip = document.createElement("div");
     chip.className = "chip";
     chip.style.background = m.color;
-    chip.innerHTML = `<span>${m.name}</span>`;
+    chip.innerHTML = `<span class="chip-avatar">${memberAvatar(m)}</span><span>${m.name}</span>`;
     const btn = document.createElement("button");
     btn.textContent = "×";
     btn.onclick = () => {
@@ -153,8 +180,10 @@ document.getElementById("miembro-add").addEventListener("click", () => {
   const colorInput = document.getElementById("miembro-color");
   const name = nameInput.value.trim();
   if (!name) return;
-  state.members.push({ id: uid(), name, color: colorInput.value });
+  state.members.push({ id: uid(), name, color: colorInput.value, avatar: selectedAvatar });
   nameInput.value = "";
+  selectedAvatar = AVATARS[0];
+  renderAvatarPicker();
   saveState();
   renderEverything();
 });
@@ -194,7 +223,11 @@ function renderRutinasPorMiembro() {
     block.className = "rutina-block";
     block.style.setProperty("--member-color", m.color);
     const tasks = state.routines.filter((r) => r.memberId === m.id);
-    block.innerHTML = `<div class="member-name">${m.name}</div>`;
+    block.innerHTML = `
+      <div class="member-card-header">
+        <span class="member-avatar">${memberAvatar(m)}</span>
+        <span class="member-name">${m.name}</span>
+      </div>`;
     if (tasks.length === 0) {
       block.innerHTML += `<p class="muted">Sin tareas todavía.</p>`;
     }
@@ -219,7 +252,26 @@ function renderRutinasPorMiembro() {
 
 /* ===================== Hoy: checklist + estrellas ===================== */
 
-function toggleTaskDone(memberId, taskId) {
+const CELEBRATION_EMOJIS = ["⭐", "✨", "🎉", "🌟"];
+
+function celebrate(originEl) {
+  const rect = originEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  for (let i = 0; i < 6; i++) {
+    const p = document.createElement("span");
+    p.className = "confetti-particle";
+    p.textContent = CELEBRATION_EMOJIS[Math.floor(Math.random() * CELEBRATION_EMOJIS.length)];
+    p.style.left = `${cx}px`;
+    p.style.top = `${cy}px`;
+    p.style.setProperty("--dx", `${(Math.random() - 0.5) * 120}px`);
+    p.style.setProperty("--rot", `${(Math.random() - 0.5) * 90}deg`);
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 950);
+  }
+}
+
+function toggleTaskDone(memberId, taskId, checkboxEl) {
   const key = todayKey();
   if (!state.completions[key]) state.completions[key] = {};
   const wasDone = !!state.completions[key][taskId];
@@ -229,6 +281,7 @@ function toggleTaskDone(memberId, taskId) {
   } else {
     state.completions[key][taskId] = true;
     state.stars[memberId] = (state.stars[memberId] || 0) + 1;
+    if (checkboxEl) celebrate(checkboxEl);
   }
   saveState();
   renderHoy();
@@ -252,6 +305,7 @@ function renderHoy() {
     card.style.setProperty("--member-color", m.color);
     card.innerHTML = `
       <div class="member-card-header">
+        <span class="member-avatar">${memberAvatar(m)}</span>
         <span class="member-name">${m.name}</span>
         <span class="member-stars">⭐ ${state.stars[m.id] || 0}</span>
       </div>
@@ -268,7 +322,8 @@ function renderHoy() {
         <input type="checkbox" id="${cbId}" ${isDone ? "checked" : ""} />
         <label for="${cbId}">${t.text}</label>
       `;
-      row.querySelector("input").addEventListener("change", () => toggleTaskDone(m.id, t.id));
+      const checkbox = row.querySelector("input");
+      checkbox.addEventListener("change", () => toggleTaskDone(m.id, t.id, checkbox));
       card.appendChild(row);
     });
     wrap.appendChild(card);
@@ -357,16 +412,19 @@ function renderPremios() {
     wrap.innerHTML = `<p class="muted">Agrega miembros en Ajustes para ver sus premios.</p>`;
     return;
   }
+  const RANK_MEDALS = ["🥇", "🥈", "🥉"];
   state.members
     .slice()
     .sort((a, b) => (state.stars[b.id] || 0) - (state.stars[a.id] || 0))
-    .forEach((m) => {
+    .forEach((m, i) => {
       const card = document.createElement("div");
       card.className = "member-card";
       card.style.setProperty("--member-color", m.color);
+      const medal = RANK_MEDALS[i] || "";
       card.innerHTML = `
         <div class="member-card-header">
-          <span class="member-name">${m.name}</span>
+          <span class="member-avatar">${memberAvatar(m)}</span>
+          <span class="member-name">${medal ? `<span class="rank-badge">${medal}</span>` : ""}${m.name}</span>
           <span class="member-stars">⭐ ${state.stars[m.id] || 0}</span>
         </div>
       `;
@@ -596,6 +654,7 @@ document.getElementById("reset-btn").addEventListener("click", () => {
 function renderEverything() {
   renderDate();
   renderWeather();
+  renderAvatarPicker();
   renderMiembrosLista();
   renderRutinaMiembroSelect();
   renderRutinasPorMiembro();
