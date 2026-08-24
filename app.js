@@ -11,6 +11,28 @@ const AVATARS = [
   "🌟", "🚀", "⚽", "🎨", "🎮", "🍕", "🍦", "🌈",
 ];
 let selectedAvatar = AVATARS[0];
+let selectedEventMemberIds = new Set();
+
+function renderMemberChipPicker(container, selectedIds) {
+  container.innerHTML = "";
+  if (state.members.length === 0) {
+    container.innerHTML = `<p class="muted">Agrega miembros en Ajustes primero.</p>`;
+    return;
+  }
+  state.members.forEach((m) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "member-chip-toggle" + (selectedIds.has(m.id) ? " selected" : "");
+    chip.style.setProperty("--member-color", m.color);
+    chip.innerHTML = `<span class="mct-avatar">${memberAvatar(m)}</span><span>${m.name}</span>`;
+    chip.onclick = () => {
+      if (selectedIds.has(m.id)) selectedIds.delete(m.id);
+      else selectedIds.add(m.id);
+      renderMemberChipPicker(container, selectedIds);
+    };
+    container.appendChild(chip);
+  });
+}
 
 function defaultState() {
   return {
@@ -563,37 +585,122 @@ function formatEventWhen(ev) {
   return d.toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+function parseEventMemberIds(ev) {
+  const raw = ev.extendedProperties?.private?.memberIds;
+  if (!raw) return [];
+  return raw.split(",").filter(Boolean);
+}
+
+async function assignMembersToEvent(eventId, memberIds) {
+  if (!gcalAccessToken) return;
+  const calId = encodeURIComponent(state.selectedCalendarId || "primary");
+  const body = { extendedProperties: { private: { memberIds: memberIds.join(",") } } };
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${calId}/events/${encodeURIComponent(eventId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${gcalAccessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (e) {
+    alert("No se pudo guardar la asignación. Intenta de nuevo.");
+    console.error(e);
+  }
+}
+
+function buildEventCard(ev) {
+  const card = document.createElement("div");
+  card.className = "event-card";
+
+  const main = document.createElement("div");
+  main.className = "event-card-main";
+
+  const title = document.createElement("span");
+  title.className = "event-title";
+  title.textContent = ev.summary || "(sin título)";
+  main.appendChild(title);
+
+  const memberIds = parseEventMemberIds(ev);
+  const assigned = state.members.filter((m) => memberIds.includes(m.id));
+  if (assigned.length > 0) {
+    const badges = document.createElement("span");
+    badges.className = "event-members";
+    assigned.forEach((m) => {
+      const b = document.createElement("span");
+      b.className = "mini-avatar";
+      b.style.setProperty("--member-color", m.color);
+      b.textContent = memberAvatar(m);
+      b.title = m.name;
+      badges.appendChild(b);
+    });
+    main.appendChild(badges);
+  }
+  card.appendChild(main);
+
+  const when = document.createElement("span");
+  when.className = "event-when";
+  when.textContent = formatEventWhen(ev);
+  card.appendChild(when);
+
+  const tagBtn = document.createElement("button");
+  tagBtn.className = "event-tag-btn";
+  tagBtn.textContent = "🏷️";
+  tagBtn.title = "Asignar a un miembro de la familia";
+  card.appendChild(tagBtn);
+
+  const panel = document.createElement("div");
+  panel.className = "event-tag-panel hidden";
+  const pickerWrap = document.createElement("div");
+  pickerWrap.className = "member-picker";
+  const localSelected = new Set(memberIds);
+  renderMemberChipPicker(pickerWrap, localSelected);
+  panel.appendChild(pickerWrap);
+
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "btn-primary";
+  saveBtn.textContent = "Guardar";
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Guardando…";
+    await assignMembersToEvent(ev.id, [...localSelected]);
+    fetchGoogleEvents();
+  };
+  panel.appendChild(saveBtn);
+  card.appendChild(panel);
+
+  tagBtn.onclick = () => panel.classList.toggle("hidden");
+
+  return card;
+}
+
 function renderGoogleEvents(events) {
   const listEl = document.getElementById("calendario-eventos");
   const hoyEl = document.getElementById("hoy-eventos");
+  listEl.innerHTML = "";
+  hoyEl.innerHTML = "";
   if (events.length === 0) {
     listEl.innerHTML = `<p class="muted">No hay eventos próximos.</p>`;
     hoyEl.innerHTML = `<p class="muted">No hay eventos próximos.</p>`;
     return;
   }
-  const html = events
-    .map(
-      (ev) => `
-      <div class="event-card">
-        <span class="event-title">${ev.summary || "(sin título)"}</span>
-        <span class="event-when">${formatEventWhen(ev)}</span>
-      </div>`
-    )
-    .join("");
-  listEl.innerHTML = html;
+  events.forEach((ev) => listEl.appendChild(buildEventCard(ev)));
 
   const todayStr = todayKey();
   const todays = events.filter((ev) => {
     const start = ev.start?.dateTime || ev.start?.date;
     return start && start.startsWith(todayStr);
   });
-  hoyEl.innerHTML = todays.length
-    ? todays.map((ev) => `
-      <div class="event-card">
-        <span class="event-title">${ev.summary || "(sin título)"}</span>
-        <span class="event-when">${formatEventWhen(ev)}</span>
-      </div>`).join("")
-    : `<p class="muted">No hay eventos para hoy.</p>`;
+  if (todays.length === 0) {
+    hoyEl.innerHTML = `<p class="muted">No hay eventos para hoy.</p>`;
+  } else {
+    todays.forEach((ev) => hoyEl.appendChild(buildEventCard(ev)));
+  }
 }
 
 document.getElementById("event-add-btn").addEventListener("click", async () => {
@@ -618,6 +725,9 @@ document.getElementById("event-add-btn").addEventListener("click", async () => {
     start: { dateTime: startDate.toISOString(), timeZone: tz },
     end: { dateTime: endDate.toISOString(), timeZone: tz },
   };
+  if (selectedEventMemberIds.size > 0) {
+    body.extendedProperties = { private: { memberIds: [...selectedEventMemberIds].join(",") } };
+  }
 
   try {
     const calId = encodeURIComponent(state.selectedCalendarId || "primary");
@@ -633,6 +743,8 @@ document.getElementById("event-add-btn").addEventListener("click", async () => {
     document.getElementById("event-title").value = "";
     document.getElementById("event-date").value = "";
     document.getElementById("event-time").value = "";
+    selectedEventMemberIds = new Set();
+    renderMemberChipPicker(document.getElementById("event-member-picker"), selectedEventMemberIds);
     fetchGoogleEvents();
   } catch (e) {
     alert("No se pudo agregar el evento. Intenta reconectar Google Calendar.");
@@ -662,6 +774,7 @@ function renderEverything() {
   renderMealTable();
   renderCompras();
   renderPremios();
+  renderMemberChipPicker(document.getElementById("event-member-picker"), selectedEventMemberIds);
 }
 
 renderEverything();
