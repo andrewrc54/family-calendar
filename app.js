@@ -14,6 +14,7 @@ function defaultState() {
     meals: {},           // { "Lunes_Desayuno": "texto" }
     shopping: [],         // {id, text, done}
     location: null,       // {lat, lon}
+    selectedCalendarId: "primary",
   };
 }
 
@@ -417,6 +418,7 @@ document.getElementById("ajustes-gcal-disconnect").addEventListener("click", () 
   document.getElementById("gcal-connected-msg").classList.add("hidden");
   document.getElementById("gcal-connect").classList.remove("hidden");
   document.getElementById("gcal-add").classList.add("hidden");
+  document.getElementById("gcal-picker").classList.add("hidden");
   document.getElementById("ajustes-gcal-disconnect").classList.add("hidden");
   document.getElementById("ajustes-gcal-connect").classList.remove("hidden");
   document.getElementById("calendario-eventos").innerHTML = `<p class="muted">Conecta tu cuenta de Google para ver tus eventos aquí.</p>`;
@@ -427,15 +429,52 @@ function onGoogleConnected() {
   document.getElementById("gcal-connect").classList.add("hidden");
   document.getElementById("gcal-connected-msg").classList.remove("hidden");
   document.getElementById("gcal-add").classList.remove("hidden");
+  document.getElementById("gcal-picker").classList.remove("hidden");
   document.getElementById("ajustes-gcal-connect").classList.add("hidden");
   document.getElementById("ajustes-gcal-disconnect").classList.remove("hidden");
+  fetchCalendarList();
   fetchGoogleEvents();
 }
+
+async function fetchCalendarList() {
+  if (!gcalAccessToken) return;
+  const sel = document.getElementById("gcal-calendar-select");
+  try {
+    const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
+      headers: { Authorization: `Bearer ${gcalAccessToken}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const calendars = data.items || [];
+    sel.innerHTML = "";
+    calendars.forEach((cal) => {
+      const opt = document.createElement("option");
+      opt.value = cal.id;
+      opt.textContent = cal.summary + (cal.primary ? " (principal)" : "");
+      if (cal.id === state.selectedCalendarId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    // Si el calendario guardado ya no existe en la lista, cae de nuevo a "primary".
+    if (!calendars.some((c) => c.id === state.selectedCalendarId)) {
+      state.selectedCalendarId = "primary";
+      saveState();
+    }
+  } catch (e) {
+    console.error("No se pudo cargar la lista de calendarios", e);
+  }
+}
+
+document.getElementById("gcal-calendar-select").addEventListener("change", (e) => {
+  state.selectedCalendarId = e.target.value;
+  saveState();
+  fetchGoogleEvents();
+});
 
 async function fetchGoogleEvents() {
   if (!gcalAccessToken) return;
   const timeMin = new Date().toISOString();
-  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&maxResults=10&singleEvents=true&orderBy=startTime`;
+  const calId = encodeURIComponent(state.selectedCalendarId || "primary");
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${calId}/events?timeMin=${encodeURIComponent(timeMin)}&maxResults=10&singleEvents=true&orderBy=startTime`;
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${gcalAccessToken}` },
@@ -516,7 +555,8 @@ document.getElementById("event-add-btn").addEventListener("click", async () => {
   };
 
   try {
-    const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+    const calId = encodeURIComponent(state.selectedCalendarId || "primary");
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calId}/events`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${gcalAccessToken}`,
