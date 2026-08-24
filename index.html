@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Calendario Familiar</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📅</text></svg>" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-date">
+    <div id="today-date" class="today-date"></div>
+    <div id="today-weather" class="today-weather">Cargando clima…</div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="hoy">🏠 Hoy</button>
+    <button class="tab-btn" data-tab="rutinas">✅ Rutinas</button>
+    <button class="tab-btn" data-tab="comidas">🍽️ Comidas</button>
+    <button class="tab-btn" data-tab="compras">🛒 Compras</button>
+    <button class="tab-btn" data-tab="calendario">📅 Calendario</button>
+    <button class="tab-btn" data-tab="premios">⭐ Premios</button>
+    <button class="tab-btn" data-tab="ajustes">⚙️</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- HOY -->
+  <section id="tab-hoy" class="tab-panel active">
+    <h2>¿Qué toca hoy?</h2>
+    <div id="hoy-miembros" class="member-grid"></div>
+
+    <h3>Próximos eventos</h3>
+    <div id="hoy-eventos" class="event-list">
+      <p class="muted">Conecta Google Calendar en Ajustes para ver tus eventos.</p>
+    </div>
+  </section>
+
+  <!-- RUTINAS -->
+  <section id="tab-rutinas" class="tab-panel">
+    <h2>Rutinas y tareas</h2>
+    <div class="add-row">
+      <select id="rutina-miembro"></select>
+      <input id="rutina-texto" type="text" placeholder="Nueva tarea (ej: Lavarse los dientes)" />
+      <button id="rutina-add" class="btn-primary">Agregar</button>
+    </div>
+    <div id="rutinas-por-miembro"></div>
+  </section>
+
+  <!-- COMIDAS -->
+  <section id="tab-comidas" class="tab-panel">
+    <h2>Planificador de comidas</h2>
+    <div class="table-scroll">
+      <table id="meal-table" class="meal-table"></table>
+    </div>
+    <h3>Lista de compras generada</h3>
+    <p class="muted">Agrega ingredientes manualmente a la lista de compras en la pestaña Compras.</p>
+  </section>
+
+  <!-- COMPRAS -->
+  <section id="tab-compras" class="tab-panel">
+    <h2>Lista de compras</h2>
+    <div class="add-row">
+      <input id="compra-texto" type="text" placeholder="Ej: Leche" />
+      <button id="compra-add" class="btn-primary">Agregar</button>
+    </div>
+    <ul id="compra-lista" class="shopping-list"></ul>
+    <button id="compra-limpiar" class="btn-secondary">Limpiar comprados</button>
+  </section>
+
+  <!-- CALENDARIO -->
+  <section id="tab-calendario" class="tab-panel">
+    <h2>Calendario</h2>
+    <div id="gcal-status" class="gcal-status">
+      <button id="gcal-connect" class="btn-primary">Conectar con Google Calendar</button>
+      <span id="gcal-connected-msg" class="hidden">✅ Conectado a Google Calendar</span>
+    </div>
+
+    <div id="gcal-add" class="add-event hidden">
+      <h3>Agregar evento</h3>
+      <div class="add-row">
+        <input id="event-title" type="text" placeholder="Título del evento" />
+        <input id="event-date" type="date" />
+        <input id="event-time" type="time" />
+        <button id="event-add-btn" class="btn-primary">Agregar a Google Calendar</button>
+      </div>
+    </div>
+
+    <h3>Próximos eventos</h3>
+    <div id="calendario-eventos" class="event-list">
+      <p class="muted">Conecta tu cuenta de Google para ver tus eventos aquí.</p>
+    </div>
+  </section>
+
+  <!-- PREMIOS -->
+  <section id="tab-premios" class="tab-panel">
+    <h2>Tabla de premios</h2>
+    <div id="premios-grid" class="member-grid"></div>
+    <p class="muted">Cada tarea de rutina completada = 1 estrella. Se suman al día.</p>
+  </section>
+
+  <!-- AJUSTES -->
+  <section id="tab-ajustes" class="tab-panel">
+    <h2>Miembros de la familia</h2>
+    <div class="add-row">
+      <input id="miembro-nombre" type="text" placeholder="Nombre" />
+      <select id="miembro-color">
+        <option value="#FF6B6B">🔴 Rojo</option>
+        <option value="#4ECDC4">🟢 Verde agua</option>
+        <option value="#4D96FF" selected>🔵 Azul</option>
+        <option value="#FFD93D">🟡 Amarillo</option>
+        <option value="#B983FF">🟣 Morado</option>
+        <option value="#FF9F45">🟠 Naranja</option>
+      </select>
+      <button id="miembro-add" class="btn-primary">Agregar miembro</button>
+    </div>
+    <div id="miembros-lista" class="chip-list"></div>
+
+    <h2>Google Calendar</h2>
+    <div id="ajustes-gcal-status" class="gcal-status">
+      <button id="ajustes-gcal-connect" class="btn-primary">Conectar con Google Calendar</button>
+      <button id="ajustes-gcal-disconnect" class="btn-secondary hidden">Desconectar</button>
+    </div>
+
+    <h2>Ubicación (para el clima)</h2>
+    <div class="add-row">
+      <button id="ubicacion-btn" class="btn-secondary">Usar mi ubicación actual</button>
+      <span id="ubicacion-status" class="muted"></span>
+    </div>
+
+    <h2>Datos</h2>
+    <button id="reset-btn" class="btn-danger">Borrar todos los datos locales</button>
+  </section>
+
+</main>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
